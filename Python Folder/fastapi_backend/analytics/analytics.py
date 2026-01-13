@@ -1,16 +1,42 @@
 import pandas as pd
 import numpy as np
 from sklearn.linear_model import LinearRegression
-
+import pymysql
 # --------------------------------------------------
 # DATA LOADING & PREPARATION
 # --------------------------------------------------
+
+
+
+
+
+
+
+
+
 
 def load_data(path="data/footfall.csv"):
     """
     Loads footfall session-level data and prepares derived columns.
     """
-    df = pd.read_csv(path)
+    conn = pymysql.connect(
+    host="localhost",
+    user="root",
+    password="53787",
+    database="age_gender_db"
+    )
+    query = """
+            SELECT
+                face_uid,
+                gender,
+                age_range,
+                confidence,
+                first_seen,
+                last_seen
+            FROM person_detection
+            """
+    df = pd.read_sql(query, conn)
+    conn.close()
 
     # Convert timestamps
     df["first_seen"] = pd.to_datetime(df["first_seen"])
