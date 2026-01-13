@@ -1,0 +1,21 @@
+# Core data analysis
+pandas
+numpy==1.23.5
+
+
+# Machine learning (trend estimation)
+scikit-learn
+
+python-dotenv
+
+# Backend API
+fastapi
+uvicorn
+
+# Data handling & utilities
+python-dateutil
+pydantic
+
+# Optional (only if you use synthetic data)
+faker
+
