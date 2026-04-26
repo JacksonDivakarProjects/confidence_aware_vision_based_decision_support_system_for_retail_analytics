@@ -2,8 +2,11 @@
 import cv2
 import os
 import time
-from services.db import insert_to_db
+from .db import insert_to_db
+from dotenv import load_dotenv
 
+load_dotenv()
+IP_VIDEO_URL = "http://" + os.getenv("IP_ADDRESS") + "/video"
 # ---------------- FACE TRACKING ---------------- #
 
 tracked_faces = {}
@@ -70,8 +73,9 @@ class VideoProcessor:
 
     def run(self):
         # 🔁 Choose ONE
-        # cap = cv2.VideoCapture(0)  # Laptop webcam
-        ip_address = "http://192.168.31.100:8080/video"
+        # path="C:\\Users\\Admin\\Documents\\Project Folder\\Videos\\test_video.mov"
+        # cap = cv2.VideoCapture(path)
+        ip_address = IP_VIDEO_URL
         cap = cv2.VideoCapture(ip_address)  # IP Webcam (example)
 
         if not cap.isOpened():

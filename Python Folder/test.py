@@ -10,3 +10,9 @@ if torch.cuda.is_available():
     print("Current device index:", torch.cuda.current_device())
 else:
     print("❌ PyTorch is using CPU only")
+
+
+import torch
+print(torch.version.cuda)
+print(torch.backends.cudnn.version())
+

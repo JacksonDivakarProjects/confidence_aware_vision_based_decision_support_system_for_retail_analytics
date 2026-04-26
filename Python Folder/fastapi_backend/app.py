@@ -1,33 +1,18 @@
 from fastapi import FastAPI
-from analytics.analytics import compute_all_insights
 from fastapi.middleware.cors import CORSMiddleware
-
-
-# --------------------------------------------------
-# CONFIG
-# --------------------------------------------------
-
-DATA_PATH = r"C:\Users\Admin\Documents\Project Folder\Python Folder\fastapi_backend\synthetic_data\face_analytics_small_data.csv"
-
-# --------------------------------------------------
-# FASTAPI APP
-# --------------------------------------------------
-
-
 
 from analytics.analytics import compute_all_insights
 from llm_recommendor.llm_recommendor import call_llm_recommendation
 
 
-
-
-
-
+# --------------------------------------------------
+# FASTAPI APP
+# --------------------------------------------------
 
 app = FastAPI(
     title="Retail Footfall Analytics API",
-    description="Exposes aggregated footfall insights for frontend consumption",
-    version="1.0.0"
+    description="Confidence-aware retail decision support API",
+    version="2.0.0"
 )
 
 app.add_middleware(
@@ -39,7 +24,7 @@ app.add_middleware(
 )
 
 # --------------------------------------------------
-# ROUTES
+# HEALTH CHECK
 # --------------------------------------------------
 
 @app.get("/")
@@ -50,65 +35,59 @@ def health_check():
     }
 
 
+# --------------------------------------------------
+# CORE INSIGHTS
+# --------------------------------------------------
+
+def get_insights():
+    return compute_all_insights()
+
+
+# --------------------------------------------------
+# INSIGHTS ENDPOINTS (FIXED KEYS)
+# --------------------------------------------------
+
+@app.get("/insights")
+def get_all_insights():
+    return get_insights()
+
+
+@app.get("/insights/baseline")
+def get_baseline_insights():
+    return get_insights().get("baseline", {})
+
+
+@app.get("/insights/confidence")
+def get_confidence_insights():
+    return get_insights().get("confidence_aware", {})
+
+
+@app.get("/insights/trend")
+def get_trend():
+    return get_insights().get("trend", {})
+
+
+# --------------------------------------------------
+# LLM RECOMMENDATION (FIXED STRUCTURE)
+# --------------------------------------------------
+
 @app.post("/recommendations/chat")
 def chat_recommendation(question: str):
-    """
-    Chat-style recommendation endpoint
-    """
-    insights = compute_all_insights(DATA_PATH)
 
-    # Only pass SAFE aggregated fields
+    insights = get_insights()
+
     llm_context = {
-        "kpis": insights["kpis"],
-        "pareto": insights["pareto"],
-        "trend": insights["trend"],
-        "demographics": insights["demographics"],
-        "engagement": insights["engagement"]
+        "baseline_kpis": insights.get("baseline", {}),
+        "confidence_kpis": insights.get("confidence_aware", {}),
+        "trend": insights.get("trend", {})
     }
 
     answer = call_llm_recommendation(llm_context, question)
 
     return {
         "question": question,
+        "baseline_kpis": llm_context["baseline_kpis"],
+        "confidence_kpis": llm_context["confidence_kpis"],
+        "trend": llm_context["trend"],
         "recommendation": answer
     }
-
-
-@app.get("/insights")
-def get_all_insights():
-    """
-    Returns all computed insights as a single response.
-    """
-    return compute_all_insights(DATA_PATH)
-
-
-@app.get("/insights/kpis")
-def get_kpis():
-    return compute_all_insights(DATA_PATH)["kpis"]
-
-
-@app.get("/insights/demographics")
-def get_demographics():
-    return compute_all_insights(DATA_PATH)["demographics"]
-
-
-@app.get("/insights/engagement")
-def get_engagement():
-    return compute_all_insights(DATA_PATH)["engagement"]
-
-
-@app.get("/insights/pareto")
-def get_pareto():
-    return compute_all_insights(DATA_PATH)["pareto"]
-
-
-@app.get("/insights/trend")
-def get_trend():
-    return compute_all_insights(DATA_PATH)["trend"]
-
-
-@app.get("/insights/volatility")
-def get_volatility():
-    return compute_all_insights(DATA_PATH)["volatility"]
-
-

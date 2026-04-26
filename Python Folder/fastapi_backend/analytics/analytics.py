@@ -2,47 +2,55 @@ import pandas as pd
 import numpy as np
 from sklearn.linear_model import LinearRegression
 import pymysql
-# --------------------------------------------------
-# DATA LOADING & PREPARATION
-# --------------------------------------------------
+import warnings
+
+# =========================
+# SUPPRESS WARNING (clean)
+# =========================
+warnings.filterwarnings("ignore", category=UserWarning)
+
+# ==================================================
+# GLOBAL CONFIDENCE SETTINGS
+# ==================================================
+
+CONFIDENCE_POWER = 1.0
+CONFIDENCE_MIN = 0.5
 
 
+def safe_float(x, default=0.0):
+    if x is None or not np.isfinite(x):
+        return default
+    return float(x)
 
+# ==================================================
+# DATA LOADING (pymysql only)
+# ==================================================
 
-
-
-
-
-
-
-def load_data(path="data/footfall.csv"):
-    """
-    Loads footfall session-level data and prepares derived columns.
-    """
+def load_data():
     conn = pymysql.connect(
-    host="localhost",
-    user="root",
-    password="53787",
-    database="age_gender_db"
+        host="localhost",
+        user="root",
+        password="53787",
+        database="age_gender_db"
     )
+
     query = """
-            SELECT
-                face_uid,
-                gender,
-                age_range,
-                confidence,
-                first_seen,
-                last_seen
-            FROM person_detection
-            """
+        SELECT
+            face_uid,
+            gender,
+            age_range,
+            confidence,
+            first_seen,
+            last_seen
+        FROM person_detection
+    """
+
     df = pd.read_sql(query, conn)
     conn.close()
 
-    # Convert timestamps
     df["first_seen"] = pd.to_datetime(df["first_seen"])
     df["last_seen"] = pd.to_datetime(df["last_seen"])
 
-    # Derived columns
     df["session_seconds"] = (
         df["last_seen"] - df["first_seen"]
     ).dt.total_seconds()
@@ -50,191 +58,118 @@ def load_data(path="data/footfall.csv"):
     df["hour"] = df["first_seen"].dt.hour
     df["date"] = df["first_seen"].dt.date
 
+    # FIX: remove deprecated warning
+    df["time_bucket"] = df["first_seen"].dt.floor("1min")
+
     return df
 
+# ==================================================
+# BASELINE ANALYTICS
+# ==================================================
 
-# --------------------------------------------------
-# KPI INSIGHTS
-# --------------------------------------------------
+def compute_kpis_baseline(df):
+    daily = df.groupby("time_bucket")["face_uid"].nunique().sort_index()
 
-def compute_kpis(df):
-    """
-    Core KPIs for dashboard
-    """
-    total_visitors = df["face_uid"].nunique()
+    decisions = (daily > daily.mean()).astype(int)
+    transitions = decisions.iloc[1:] != decisions.iloc[:-1].values
+    flip_rate = int(transitions.sum())
 
-    avg_session = df["session_seconds"].mean()
-
-    daily_counts = df.groupby("date")["face_uid"].nunique()
-    avg_daily_footfall = daily_counts.mean()
-
-    peak_hour_series = df.groupby("hour")["face_uid"].nunique()
-    peak_hour = int(peak_hour_series.idxmax())
-    peak_hour_footfall = int(peak_hour_series.max())
+    stability = 1 - flip_rate / max(len(decisions) - 1, 1)
 
     return {
-        "total_visitors": int(total_visitors),
-        "avg_daily_footfall": round(avg_daily_footfall, 2),
-        "avg_session_seconds": round(avg_session, 2),
-        "peak_hour": peak_hour,
-        "peak_hour_footfall": peak_hour_footfall
+        "total_footfall": int(df["face_uid"].nunique()),
+        "decision_flip_rate": flip_rate,
+        "avg_daily_footfall": round(safe_float(daily.mean()), 2),
+        "avg_session_seconds": round(safe_float(df["session_seconds"].mean()), 2),
+        "daily_variance": round(safe_float(daily.var()), 2),
+        "stability_score": round(safe_float(stability), 3),
+        "num_days": int(len(daily))
     }
 
+# ==================================================
+# CONFIDENCE ANALYTICS
+# ==================================================
 
-# --------------------------------------------------
-# DEMOGRAPHIC INSIGHTS
-# --------------------------------------------------
+def compute_kpis_confidence(df):
+    daily_count = df.groupby("time_bucket")["face_uid"].nunique().sort_index()
+    daily_conf = df.groupby("time_bucket")["confidence"].mean().clip(lower=CONFIDENCE_MIN)
 
-def compute_demographics(df):
-    """
-    Age and gender distribution
-    """
-    age_dist = (
-        df.groupby("age_range")["face_uid"]
-        .nunique()
-        .sort_values(ascending=False)
-    )
+    mean_conf = safe_float(daily_conf.mean(), 1.0)
+    effective_signal = daily_count * (daily_conf ** CONFIDENCE_POWER)
 
-    gender_dist = (
-        df.groupby("gender")["face_uid"]
-        .nunique()
-    )
+    decisions = (effective_signal > effective_signal.mean()).astype(int)
+    transitions = decisions.iloc[1:] != decisions.iloc[:-1].values
+    flip_rate = int(transitions.sum())
 
-    age_pct = (age_dist / age_dist.sum() * 100).round(2).to_dict()
-    gender_pct = (gender_dist / gender_dist.sum() * 100).round(2).to_dict()
-
-    top_age_group = age_dist.idxmax()
+    stability = 1 - flip_rate / max(len(decisions) - 1, 1)
 
     return {
-        "top_age_group": top_age_group,
-        "age_distribution_pct": age_pct,
-        "gender_distribution_pct": gender_pct
+        "avg_session_seconds": round(df["session_seconds"].mean(), 2),
+        "decision_flip_rate": flip_rate,
+        "num_days": int(len(effective_signal)),
+        "total_footfall_weighted": round(safe_float(effective_signal.sum() / mean_conf), 2),
+        "avg_daily_footfall_weighted": round(safe_float(effective_signal.mean() / mean_conf), 2),
+        "daily_variance_weighted": round(safe_float(effective_signal.var() / (mean_conf ** 2)), 2),
+        "stability_score": round(safe_float(stability), 3),
     }
 
-
-# --------------------------------------------------
-# ENGAGEMENT INSIGHT (DWELL TIME)
-# --------------------------------------------------
-
-def compute_engagement(df):
-    """
-    Average dwell time by age group
-    """
-    dwell_by_age = (
-        df.groupby("age_range")["session_seconds"]
-        .mean()
-        .round(2)
-        .to_dict()
-    )
-
-    return {
-        "avg_dwell_time_by_age": dwell_by_age
-    }
-
-
-# --------------------------------------------------
-# PARETO INSIGHT (80–20 RULE)
-# --------------------------------------------------
-
-def compute_pareto(df):
-    """
-    Identifies how many hours contribute to 80% of footfall
-    """
-    hourly_counts = (
-        df.groupby("hour")["face_uid"]
-        .nunique()
-        .reset_index(name="count")
-        .sort_values("count", ascending=False)
-    )
-
-    hourly_counts["cum_pct"] = (
-        hourly_counts["count"].cumsum()
-        / hourly_counts["count"].sum()
-        * 100
-    )
-
-    top_hours = hourly_counts[hourly_counts["cum_pct"] <= 80]
-    top_hours_pct = len(top_hours) / len(hourly_counts) * 100
-
-    return {
-        "top_hours_percentage": round(top_hours_pct, 2),
-        "footfall_contribution_pct": 80
-    }
-
-
-# --------------------------------------------------
-# TREND ESTIMATION (LINEAR REGRESSION)
-# --------------------------------------------------
+# ==================================================
+# TREND
+# ==================================================
 
 def compute_trend(df):
-    """
-    Long-term demand trend using linear regression
-    """
     daily = (
-        df.groupby("date")["face_uid"]
+        df.groupby("time_bucket")["face_uid"]
         .nunique()
         .reset_index(name="visitors")
+        .sort_values("time_bucket")
     )
 
     daily["time_index"] = np.arange(len(daily))
 
-    X = daily[["time_index"]]
-    y = daily["visitors"]
-
-    model = LinearRegression()
-    model.fit(X, y)
-
+    model = LinearRegression().fit(daily[["time_index"]], daily["visitors"])
     slope = float(model.coef_[0])
-
-    if abs(slope) < 0.1:
-        interpretation = "Stable demand"
-    elif slope > 0:
-        interpretation = "Increasing demand"
-    else:
-        interpretation = "Decreasing demand"
 
     return {
         "slope": round(slope, 4),
-        "interpretation": interpretation
+        "interpretation": (
+            "Stable demand" if abs(slope) < 0.1
+            else "Increasing demand" if slope > 0
+            else "Decreasing demand"
+        )
     }
 
+# ==================================================
+# MASTER (FRONTEND-COMPATIBLE KEYS)
+# ==================================================
 
-# --------------------------------------------------
-# VOLATILITY INSIGHT
-# --------------------------------------------------
-
-def compute_volatility(df):
-    """
-    Measures demand stability using coefficient of variation
-    """
-    daily_counts = df.groupby("date")["face_uid"].nunique()
-
-    mean = daily_counts.mean()
-    std = daily_counts.std()
-
-    cv = std / mean if mean > 0 else 0
+def compute_all_insights():
+    df = load_data()
 
     return {
-        "coefficient_of_variation": round(cv, 3),
-        "stability": "Stable" if cv < 0.5 else "Volatile"
+        "baseline": compute_kpis_baseline(df),
+        "confidence_aware": compute_kpis_confidence(df),
+        "trend": compute_trend(df)
     }
 
+# ==================================================
+# DEBUG
+# ==================================================
 
-# --------------------------------------------------
-# MASTER FUNCTION (FOR FASTAPI)
-# --------------------------------------------------
+if __name__ == "__main__":
+    results = compute_all_insights()
 
-def compute_all_insights(path="data/footfall.csv"):
-    """
-    Single call used by FastAPI
-    """
-    df = load_data(path)
+    print("\n=== DEBUG STRUCTURE ===")
+    print(results)
 
-    return {
-        "kpis": compute_kpis(df),
-        "demographics": compute_demographics(df),
-        "engagement": compute_engagement(df),
-        "pareto": compute_pareto(df),
-        "trend": compute_trend(df),
-        "volatility": compute_volatility(df)
-    }
+    print("\n=== BASELINE ===")
+    for k, v in results.get("baseline", {}).items():
+        print(f"{k}: {v}")
+
+    print("\n=== CONFIDENCE ===")
+    for k, v in results.get("confidence_aware", {}).items():
+        print(f"{k}: {v}")
+
+    print("\n=== TREND ===")
+    for k, v in results.get("trend", {}).items():
+        print(f"{k}: {v}")
