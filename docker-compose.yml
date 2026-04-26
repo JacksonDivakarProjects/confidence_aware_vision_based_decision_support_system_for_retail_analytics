@@ -1,0 +1,29 @@
+version: "3.9"
+
+services:
+  backend:
+    build: ./Python Folder/fastapi_backend
+    ports:
+      - "9000:9000"
+    env_file:
+      - .env
+    environment:
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - MODEL_NAME=${MODEL_NAME}
+    depends_on:
+      - cv
+
+  cv:
+    build: ./Python Folder/age_and_gender_classification
+    env_file:
+      - .env
+    environment:
+      - IP_ADDRESS=${IP_ADDRESS}
+    network_mode: "host"
+
+  frontend:
+    build: ./React Folder/frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend

@@ -1,41 +1,42 @@
-import { createContext, useContext, useEffect, useState } from "react";
+// FILE: src/context/ThemeContext.js
+
+import React, { createContext, useContext, useState, useEffect } from 'react';
 
 const ThemeContext = createContext();
 
 export const ThemeProvider = ({ children }) => {
-  const [theme, setTheme] = useState("light");
-
-  // Load saved theme safely
-  useEffect(() => {
-    try {
-      const savedTheme = localStorage.getItem("theme");
-      if (savedTheme === "dark" || savedTheme === "light") {
-        setTheme(savedTheme);
-      }
-    } catch (e) {
-      console.warn("Theme load failed:", e);
+  const [isDark, setIsDark] = useState(() => {
+    // Check localStorage for saved theme preference
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+      return savedTheme === 'dark';
     }
-  }, []);
+    // Otherwise check system preference
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  });
 
-  // Apply theme to <html>, NOT body or div
   useEffect(() => {
-    document.documentElement.setAttribute("data-theme", theme);
-    try {
-      localStorage.setItem("theme", theme);
-    } catch (e) {
-      console.warn("Theme save failed:", e);
-    }
-  }, [theme]);
+    // Apply theme to document root
+    document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+    // Save preference to localStorage
+    localStorage.setItem('theme', isDark ? 'dark' : 'light');
+  }, [isDark]);
 
   const toggleTheme = () => {
-    setTheme((prev) => (prev === "light" ? "dark" : "light"));
+    setIsDark(prev => !prev);
   };
 
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme }}>
+    <ThemeContext.Provider value={{ isDark, toggleTheme }}>
       {children}
     </ThemeContext.Provider>
   );
 };
 
-export const useTheme = () => useContext(ThemeContext);
+export const useTheme = () => {
+  const context = useContext(ThemeContext);
+  if (!context) {
+    throw new Error('useTheme must be used within a ThemeProvider');
+  }
+  return context;
+};

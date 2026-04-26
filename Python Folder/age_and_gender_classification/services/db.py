@@ -10,6 +10,7 @@ def insert_to_db(face_id, gender, age, confidence):
     )
     cursor = conn.cursor()
 
+    
     cursor.execute("""
         INSERT INTO person_detection
         (face_uid, gender, age_range, confidence, first_seen, last_seen)

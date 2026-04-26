@@ -18,4 +18,5 @@ pydantic
 
 # Optional (only if you use synthetic data)
 faker
-
+requests
+pymysql

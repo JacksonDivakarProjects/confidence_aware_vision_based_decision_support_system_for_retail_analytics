@@ -3,12 +3,9 @@
 import React, { useEffect, useState } from 'react';
 import { fetchInsights } from '../api';
 import KpiCard from '../components/KpiCard';
-import GenderChart from '../components/GenderChart';
-import ParetoChart from '../components/ParetoChart';
 import './Dashboard.css';
 
 console.log("DASHBOARD MOUNTED");
-
 
 const Dashboard = () => {
   const [data, setData] = useState(null);
@@ -38,164 +35,162 @@ const Dashboard = () => {
     );
   }
 
+  // ✅ NEW DATA CONTRACT
+  
+  const baselineKpis = data.baseline;
+  const confidenceKpis = data.confidence_aware;
+  const trend = data.trend;
+
+
   return (
     <div className="dashboard">
       <div className="dashboard-container">
-        
+
         {/* Page Header */}
         <div className="page-header">
           <div className="header-content">
             <h1 className="page-title">Retail Footfall Analytics</h1>
             <p className="page-subtitle">
-              Real-time insights and business intelligence for your retail operations
+              Confidence-aware decision support for retail operations
             </p>
           </div>
           <div className="header-badge">
-            <span className="badge-icon">🔥</span>
-            <span className="badge-text">Live Data</span>
+            <span className="badge-icon">🛡️</span>
+            <span className="badge-text">Stability Mode</span>
           </div>
         </div>
 
-        {/* KPI Cards */}
+        {/* KPI Cards — CONFIDENCE AWARE */}
         <section className="kpi-section">
+          <div className="section-header">
+            <h2 className="section-title">Confidence-Aware KPIs</h2>
+            <p className="section-description">Enhanced metrics with confidence weighting applied</p>
+          </div>
+          
           <div className="kpi-grid">
-            <KpiCard 
-              title="Total Visitors" 
-              value={data.kpis.total_visitors} 
+            <KpiCard
+              title="Total Footfall"
+              value={confidenceKpis.total_footfall_weighted.toLocaleString()}
               icon="👥"
-              trend={12.5}
+              subtitle="Weighted"
             />
-            <KpiCard 
-              title="Avg Daily Footfall" 
-              value={data.kpis.avg_daily_footfall} 
+
+            <KpiCard
+              title="Daily Average"
+              value={Math.round(confidenceKpis.avg_daily_footfall_weighted).toLocaleString()}
               icon="📊"
-              trend={8.3}
+              subtitle="Footfall"
             />
-            <KpiCard 
-              title="Avg Session" 
-              value={`${data.kpis.avg_session_seconds}s`} 
+
+            <KpiCard
+              title="Session Duration"
+              value={`${confidenceKpis.avg_session_seconds}s`}
               icon="⏱️"
-              trend={-3.2}
+              subtitle="Average"
             />
-            <KpiCard 
-              title="Peak Hour" 
-              value={`${data.kpis.peak_hour}:00`} 
-              icon="🕐"
+
+            <KpiCard
+              title="Stability Score"
+              value={confidenceKpis.stability_score}
+              icon="🛡️"
+              subtitle="High Confidence"
             />
           </div>
         </section>
 
-        {/* Charts Section */}
-        <section className="charts-section">
-          <div className="charts-grid">
-            
-            {/* Gender Distribution */}
-            <div className="chart-card">
-              <div className="card-header">
-                <div className="header-left">
-                  <span className="card-icon">👥</span>
-                  <h2 className="card-title">Gender Distribution</h2>
-                </div>
-                <span className="card-badge">Demographics</span>
-              </div>
-              <div className="card-body">
-                <GenderChart data={data.demographics.gender_distribution_pct} />
-              </div>
-            </div>
+        {/* KPI Cards — BASELINE */}
+        <section className="kpi-section baseline">
+          <div className="section-header">
+            <h2 className="section-title">Baseline KPIs</h2>
+            <p className="section-description">Standard metrics without confidence adjustment</p>
+          </div>
+          
+          <div className="kpi-grid">
+            <KpiCard
+              title="Total Footfall"
+              value={baselineKpis.total_footfall.toLocaleString()}
+              icon="👥"
+              subtitle="Unweighted"
+            />
 
-            {/* Pareto Chart */}
-            <div className="chart-card">
-              <div className="card-header">
-                <div className="header-left">
-                  <span className="card-icon">⏰</span>
-                  <h2 className="card-title">Time Concentration</h2>
-                </div>
-                <span className="card-badge">Pareto Analysis</span>
-              </div>
-              <div className="card-body">
-                <ParetoChart percentage={data.pareto.top_hours_percentage} />
-                <p className="chart-description">
-                  Top <strong>{data.pareto.top_hours_percentage}%</strong> of hours contribute to{' '}
-                  <strong>80%</strong> of total footfall
-                </p>
-              </div>
-            </div>
+            <KpiCard
+              title="Daily Average"
+              value={Math.round(baselineKpis.avg_daily_footfall).toLocaleString()}
+              icon="📊"
+              subtitle="Footfall"
+            />
 
+            <KpiCard
+              title="Session Duration"
+              value={`${baselineKpis.avg_session_seconds}s`}
+              icon="⏱️"
+              subtitle="Average"
+            />
+
+            <KpiCard
+              title="Stability Score"
+              value={baselineKpis.stability_score}
+              icon="⚠️"
+              subtitle="Standard"
+            />
           </div>
         </section>
 
-        {/* Trend Analysis */}
-        <section className="trend-section">
-          <div className="trend-card">
-            <div className="card-header">
-              <div className="header-left">
+        {/* Bottom Grid: Trend + Insights */}
+        <div className="bottom-grid">
+          
+          {/* Trend Analysis */}
+          <section className="trend-section">
+            <div className="trend-card">
+              <div className="card-header">
                 <span className="card-icon">📈</span>
-                <h2 className="card-title">Demand Trend Analysis</h2>
+                <h2 className="card-title">Demand Trend</h2>
               </div>
-            </div>
-            <div className="card-body">
-              <div className="trend-content">
-                <div className="trend-info">
-                  <div className="info-item">
-                    <span className="info-label">Status</span>
-                    <span className={`trend-status ${data.trend.interpretation.toLowerCase()}`}>
-                      {data.trend.interpretation}
-                    </span>
-                  </div>
-                  <div className="info-item">
-                    <span className="info-label">Slope</span>
-                    <span className="trend-value">{data.trend.slope}</span>
-                  </div>
-                </div>
-                <div className="trend-visual">
-                  <div className="trend-line">
-                    <div className={`trend-arrow ${data.trend.interpretation.toLowerCase()}`}>
-                      {data.trend.interpretation === 'Growing' ? '📈' : 
-                       data.trend.interpretation === 'Declining' ? '📉' : '➡️'}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
 
-        {/* Insights Section */}
-        <section className="insights-section">
-          <div className="insights-card">
-            <div className="card-header">
-              <div className="header-left">
+              <div className="card-body">
+                <div className="trend-metric">
+                  <span className="metric-label">Status</span>
+                  <span className="metric-value status">{trend.interpretation}</span>
+                </div>
+
+                <div className="trend-metric">
+                  <span className="metric-label">Slope</span>
+                  <span className="metric-value slope">{trend.slope}</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Key Insights */}
+          <section className="insights-section">
+            <div className="insights-card">
+              <div className="card-header">
                 <span className="card-icon">💡</span>
                 <h2 className="card-title">Key Insights</h2>
               </div>
-            </div>
-            <div className="card-body">
-              <div className="insights-grid">
+
+              <div className="card-body">
                 <div className="insight-item">
-                  <div className="insight-icon success">✓</div>
-                  <div className="insight-content">
-                    <h4>Peak Performance</h4>
-                    <p>Highest traffic recorded at {data.kpis.peak_hour}:00</p>
-                  </div>
+                  <span className="insight-bullet">•</span>
+                  <p>
+                    Stability improved from <strong>{baselineKpis.stability_score}</strong> to{" "}
+                    <strong>{confidenceKpis.stability_score}</strong> with confidence weighting
+                  </p>
                 </div>
+                
+                
+                
                 <div className="insight-item">
-                  <div className="insight-icon warning">⚡</div>
-                  <div className="insight-content">
-                    <h4>Optimization Opportunity</h4>
-                    <p>Consider staff adjustment during peak hours</p>
-                  </div>
-                </div>
-                <div className="insight-item">
-                  <div className="insight-icon info">ℹ️</div>
-                  <div className="insight-content">
-                    <h4>Trend Alert</h4>
-                    <p>Footfall shows {data.trend.interpretation.toLowerCase()} pattern</p>
-                  </div>
+                  <span className="insight-bullet">•</span>
+                  <p>
+                    Trend indicates <strong>{trend.interpretation}</strong> demand pattern
+                  </p>
                 </div>
               </div>
             </div>
-          </div>
-        </section>
+          </section>
+
+        </div>
 
       </div>
     </div>

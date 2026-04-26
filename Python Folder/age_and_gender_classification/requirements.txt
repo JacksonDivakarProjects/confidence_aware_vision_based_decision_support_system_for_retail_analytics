@@ -18,3 +18,7 @@ protobuf==3.19.6
 
 # Optional (only if used)
 mediapipe==0.10.8
+
+
+pymysql
+python-dotenv
